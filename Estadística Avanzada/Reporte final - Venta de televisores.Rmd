@@ -1,0 +1,191 @@
+---
+title: "Reporte final - Venta de televisores"
+author: "Daniel Salvador Cázares García"
+date: "`r Sys.Date()`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# Resumen
+
+En este trabajo, por medio del análisis de datos de las ventas de televisores en los últimos años, se busco entender el comportamiento de las ventas a lo largo de los años con el objetivo de poder estimar las ventas en los próximos trimestres e incluso años.
+
+Para lo anterior, se emplearon métodos estadisticos como modelos lineales, regresión, tendencia y estacionalidad, los cuales permitieron  explorar las ventas a lo largo de los años y realizar predicciones con respecto al tiempo.
+
+Como resultado final, se realizó un modelo de regresión lineal para predecir las ventas a futuro.
+
+
+<!-- -------------------------------------------------- -->
+
+
+# Introducción
+
+El análisis de datos cada vez cobra más importancia para las empresas y organizaciones. Un ejemplo muy común y de gran relevancia son las compañías que ofrecen productos y servicios, pues esto les permite analizar sus ventas y el comportamiento de los consumidores para mejorar sus ganancias.
+
+A continuación, se utilizaran diferentes métodos estadisticos para analizar los datos de ventas de televisores en los últimos 4 años y tratar de predecir ¿Cuáles son las ventas estimadas a futuro?
+
+
+## Datos
+
+    Año	1				2				3				4			
+    Trimestre	1	2	3	4	1	2	3	4	1	2	3	4	1	2	3	4
+    Ventas (miles de $)	4.8	4.1	6.0	6.5	5.8	5.2	6.8	7.4	6.0	5.6	7.5	7.8	6.3	5.9	8.0	8.4
+
+```{r}
+t = 1:16
+v = c(4.8, 4.1, 6, 6.5, 5.8, 5.2, 6.8, 7.4, 6, 5.6, 7.5, 7.8, 6.3, 5.9, 8, 8.4)
+```
+
+
+<!-- -------------------------------------------------- -->
+
+
+# Análisis de los resultados
+
+### Gráfico de dispersión para observar tendencia y ciclos
+
+Inicialmente, se realiza un gráfico de dispersión para poder explorar de forma general los datos. Se puede observar que existe una tendencia positiva que aumenta con el paso de los años y además, existen ciclos en los que se presenta un patrón o estacionalidad.
+
+```{r}
+plot(v, type = "b", xlab="Trimestre", ylab= "Ventas")
+```
+
+### Análisis de tendencia y estacionalidad
+
+#### Descompósición de la serie de tiempo
+
+Posteriormente, se realizó una descomposición de la serie de tiempo en componentes de froma gráfica para poder analizar su comportamiento. Se puede ver que existe una tendencia positiva, así como estacionalidad y un cierto grado de aleatoriedad.
+
+
+```{r}
+anio = ts(v, frequency = 4, start(c(2016,1)))
+T = decompose(anio, type = "m")
+
+plot(T, xlab = "Año")
+```
+
+
+### Análisis del modelo lineal de la tendencia
+
+#### Regresión lineal
+
+Depués de analizar el comportamiento y la tendencia que han seguido las ventas en el pasado, ahora se busca realizar un modelo de regresión lineal que siga la tendencia de las ventas desestacionalizadas y que permita pronosticar las ventas de televisores con respecto al tiempo para el futuro.
+
+Se puede observar que la ecuación obtenida que modela la tendencia de dicha situación es $tendencia ventas = 5.1080 + 0.1474 * trimestre$. Si se gráfica la recta se puede ver que se ajusta de forma muy cercana a las ventas.
+
+```{r}
+v_desest = (T$x)/(T$seasonal)
+y = v_desest
+reg = lm(y~t)
+
+plot(t, y, type = "l")
+abline(reg, col = "red")
+text(5,7,"v = 5.1080 + 0.1474 t")
+```
+
+### Pertinencia del modelo lineal
+
+Aunque la gráfica aparentemente si se ajusta, también es importante realizar algunas pruebas para verificar si el modelo es realmente adecuado. Para esto, se analizaron la significancia, la variabilidad, los residuos y la normalidad. En todas las pruebas se considera una significacancia o valor p de 0.05.
+
+```{r}
+sum = summary(reg)
+sum
+```
+
+#### Significancia de β1
+
+$H_0: β_1=0 \quad\quad\quad H_1: β_1≠0$
+Se rechaza $H_0$ si $p < 0.05$ 
+
+Se observa que la p obtenida es menor a 0.05, por lo que β1 si es significativa.
+
+#### Variabilidad explicada por el modelo
+
+El coeficiente de determinación del modelo es de 0.9208, lo que significa que logra explicar el 92.08% de la variabilidad de los datos. 
+
+
+#### Análisis de los residuos y normalidad
+
+Para analizar la distribución de los residuos, se puede realizar una graficación de los mismos. Se puede ver que los residuos no siguen alguna tendencia.
+
+```{r}
+plot(reg$residuals, type = "b"  ,xlab = "Trimestre", ylab = "Residuos", main = "Residuos")
+```
+
+A simple vista se podría decir que los residuos tienen una distribución aleatoria. Sin embargo, además de graficar, es recomendable realizar pruebas estadisticas que permitan verificar y confirmar dicha hipotesis. Para esto, se puede utilizar la prueba de normalidad de Saphiro-Wilk, donde:
+
+$H_0:$Residuos normales $\quad\quad\quad H_1:$ Residuos NO normales
+Se rechaza $H_0$ si $p < 0.05$ 
+
+```{r}
+shapiro.test(reg$residuals)
+```
+
+De este modo, se obtiene un valor p mayor que 0.05, por lo que no se rechaza la hipotesis nula y se puede confirmar que los residuos se distribuyen de forma normal.
+
+
+## Errores de la predicción de la serie de tiempo
+
+Además de verificar si el modelo es adecuado, también es importante observar la cantidad de error que puede existir en la predicción de la serie de tiempo. Para esto, se puede calcular el error Medio (CME) y el promedio de los errores porcentuales (EPAM).
+
+```{r}
+f = function(x) {reg$coefficients[1] + reg$coefficients[2] * x}
+pred = f(t)
+
+CME=mean((v - pred)^2, na.rm = TRUE)
+CME
+
+EPAM = mean(abs((v - pred)/v), na.rm = TRUE)
+EPAM
+```
+
+Se puede observar, que el error medio porcentual no es tan elevado, lo cual indica que que el modelo es relativamente bueno.
+
+
+## Predicciones vs el tiempo
+
+Adicionalmente, podemos graficar las predicciones con respecto al tiempo para poder compararlas con los valores reales de las ventas. Se puede observar que las predicciones son muy cercanas a los valores reales. Además, estas también siguen el mismo patrón de estacionalidad, donde se reducen y aumentan las ventas cada 2 trimestres.
+
+```{r}
+t = 1:16
+plot(t,v, type = "b")
+lines(t, predict(reg) *  T$seasonal, type = "b", col = "red")
+```
+
+## Pronóstico para el siguiente año
+
+Finalmente, ya con el modelo realizado y verificado, se puede utilizar el modelo para obtener pronóstico a futuro. En este caso, se realizará el calculo para el siguiente año.
+
+```{r}
+trimestre = 17:20
+ventas = f(17:20) * T$figure
+data.frame(trimestre, ventas)
+```
+
+
+## Conclusiones del modelo
+
+De forma general, se puede concluir que el modelo es adecuado para realizar pronosticos de las ventas, pues además de ajustarse muy cercanamente a los valores reales, también cumplió con las pruebas realizadas. 
+
+
+<!-- -------------------------------------------------- -->
+
+
+# Conclusión
+
+La utilización de herramientas estadísticas como la estacionalidad y los modelos de regresión pueden ser de gran utilidad para modelar situaciones de la vida real.
+
+En este caso, se pudo realizar un modelo lineal para una serie no estacionaria que permite predecir las ventas de televisores. Al tratarse de un modelo sencillo con poco error, puede utilizarse para hacer predicciones con cierto grado de certeza a futuro. Con este, se estiman ventas para el siguiente año que rondan entre 6.5 y 9.20 mil dólares por trimestre. 
+
+Cabe mencionar que, en las situaciones reales de ventas, por lo general existen otras variables que también influyen además de la estacionalidad y que el registro de datos se tiene con una mayor frecuencia (cada mes o semana), por lo que normalmente sería necesario un análisis e implementación más complejos.
+
+
+<!-- -------------------------------------------------- -->
+
+
+# Anexos
+
+**Repositorio de Github:** https://github.com/dscazares/Portafolio-TC3007C

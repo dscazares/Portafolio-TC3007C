@@ -1,0 +1,200 @@
+---
+title: "Procesamiento de datos multivariados - Portafolio Implementación"
+author: "Daniel Salvador Cázares García A01197517"
+date: "`r Sys.Date()`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+# Resumen
+
+En este trabajo, por medio del análisis de datos de un estudio realizado en 53 lagos de Florida, se busco examinar los factores que influyen en la contaminación por mercurio en peces. 
+
+Para lo anterior, se emplearon métodos estadisticos como pruebas de normalidad, normalidad multivariada, sesgo, curtosis y componentes principales, los cuales permitieron  explorar las diferentes variables y su relación.
+
+Como resultado general, se encontró que el PH, la alcalinidad, el calcio y la clorofila son los factores que más influyen en la concentración de mercurio.
+
+<!-- -------------------------------------------------- -->
+
+
+# Introducción
+
+La contaminación por mercurio en cuerpos de agua es un problema ambiental y de salud, que no solo afecta a los seres vivos que habitan estos ecosistemas, sino también a las personas que consumen peces o mariscos provenientes de estos lugares. 
+
+A continuación, se utilizaran diferentes métodos estadisticos para analizar los datos de 53 lagos de Florida y examinar ¿Qué factores influyen en el nivel de contaminación por mercurio?
+
+
+<!-- -------------------------------------------------- -->
+
+
+## Datos
+
+Se tienen datos de 53 lagos de Florida obtenidos en un estudio reciente. Las variables que se midieron son las siguientes:
+
+* X1 = número de indentificación
+* X2 = nombre del lago
+* X3 = alcalinidad (mg/l de carbonato de calcio)
+* X4 = PH
+* X5 = calcio (mg/l)
+* X6 = clorofila (mg/l)
+* X7 = concentración media de mercurio (parte por millón) en el tejido muscualar del grupo de peces * estudiados en cada lago
+* X8 = número de peces estudiados en el lago
+* X9 = mínimo de la concentración de mercurio en cada grupo de peces
+* X10 = máximo de la concentración de mercurio en cada grupo de peces
+* X11 = estimación (mediante regresión) de la concentración de mercurio en el pez de 3 años (o promedio de * mercurio cuando la edad no está disponible)
+* X12 = indicador de la edad de los peces (0: jóvenes; 1: maduros)
+
+```{r}
+# Leer base de datos
+df = read.csv("mercurio.csv") 
+```
+
+
+<!---------------------------------------------------- -->
+
+
+# Análisis
+
+## Análisis de normalidad
+
+Para analizar el comportamiento de los datos, identificar la distribución de las variables y detectar una posible normalidad multivariada entre variables, se realizaran pruebas de normalidad.
+
+
+### Prueba de Anderson-Darling
+
+De acuerdo con la prueba de Anderson Darling y viendo los valores de p, se observa que las variables X4 (PH) y X10 (máximo de la concentración de mercurio en cada grupo de peces) se comportan de forma normal, mientras que el resto de las variables no.
+
+```{r}
+library(MVN)
+
+M = df[,c(-1,-2, -12)]
+multi_vn = mvn(data = M, mvnTest = "mardia")
+
+multi_vn$univariateNormality
+```
+
+### Prueba de Mardia
+
+En cuanto a la normalidad multivariada, la prueba de Mardia muestra que esta no existe una normalidad multivariada conjunta entre el grupos de variables.
+
+```{r}
+multi_vn$multivariateNormality
+```
+
+
+### Prueba de normalidad en variables con normalidad
+
+Dado el resultado anterior, se volvieron a realizar ambas pruebas, pero ahora para las variables que mostraron normalidad.
+
+```{r}
+M2 = subset(M, select=c("X4", "X10"))
+
+multi_vn_2 = mvn(data = M2, mvnTest = "mardia")
+
+multi_vn_2$univariateNormality
+multi_vn_2$multivariateNormality
+```
+
+De nuevo se obtiene que X4 y X10 tienen normalidad. Sin embargo, ahora también se puede ver que existe normalidad multivariada conjunta entre ambas variables. Adicionalmente, se observa un bajo sesgo y curtosis, lo cual indica igualmente una cercanía a la normalidad.
+
+Este comportamiento de normalidad entre ambas variables también se puede ver de forma visual si se realiza una gráfica de contorno.
+
+```{r}
+mvn(M2, multivariatePlot = "contour")
+```
+
+### Detección de datos atípicos
+
+La existencia de normalidad multivariada supone la ausencia de valores atípicos. Por lo tanto, es necesario verificar si existen valores atípicos en los datos. Para detectar datos atípicos en la normal multivariada entre variables se pueden utilizar la distancia de Mahalanobis y el gráfico QQplot (Prueba Chi Cuadrada), los cuales permiten medir la distancia entre 2 puntos en un espacio multivariado.
+
+Por medio de la gráfica realizada se puede observar que existen 5 valores atípicos. Sin embargo, +90% de las observaciones se encuentran dentro del estimado.
+
+```{r}
+mvn(data = M2, multivariateOutlierMethod = "quan")
+```
+
+
+<!-- -------------------------------------------------- -->
+
+
+## Análisis de componentes principales
+
+Después de explorar el comportamiento de los datos y su normalidad, se llevará a cabo un análisis de componenentes principales de la base de datos. El uso de esta herramienta es adecuado, pues permitirá identificar los factores que influyen principalmente (las que aportan mayor variabilidad) en la contaminación por mercurio en los peces y reducir la dimensionalidad del conjunto de datos a variables que realmente nos importan.
+
+
+### Matriz de correlaciones
+
+Como primera parte del análisis y puesto que se busca reducir la dimensionalidad del conjunto de datos, se utiliza una matriz de correlación para explorar la correlación entre las variables. Se puede observar que existe una correlación considerable entre varias de las variables, por lo que si es posible el uso de componentes principales.
+
+```{r}
+M = df[,c(-1,-2)]
+m_cor = cor(M)
+m_cor
+```
+
+
+### Obtención de componentes principales
+
+Para continuar con el análisis de componentes, es necesario descomponer los datos en valores y vectores propios.
+
+```{r}
+vp = eigen(m_cor)
+vp
+```
+
+Posteriormente, puesto que se busca encontrar el número de componentes apropiado para reducir la dimensionalidad, es necesario calcular la proporción de varianza explicada acumulada por lo componentes.
+
+Con esto, se puede observar que 4 o 5 ya empieza a ser una cantidad adecuada de componentes principales, pues con los primeros 4 componentes se explica el 87% de la varianza, mientras que 5 componentes ya son suficientes para explicar el 93% de los datos y reducir la dimensionalidad de los datos a la mitad.
+
+```{r}
+varianza = c(rep(sum(diag(m_cor)), 11))
+lambdas = data.frame(vp[1])
+
+prop_acum = lambdas/varianza
+
+cumsum(prop_acum)
+```
+
+
+Por último, se realizó un gráfico con los vectorios propios asociados a las variables y las puntuaciones de las observaciones de las dos primeras componentes. 
+
+Cuanto más largos son los vectores o flechas rojas, mayor es el valor la observación en ese componente. Del mismo modo que se observo con la varianza acumulada, se puede observar que el componente 1 tiene una mayor variabilidad que el componente 2 por la forma en la que distribuyen los datos. Según la dirección, también se puede observar el tipo de relación (positiva o negativa) que tiene cada variable con los componentes. Cabe destacar que X8 es la variable con menos peso y se comporta de forma poco relacionada con el resto de las variables, así como con ambos componentes.
+
+```{r}
+pca = prcomp(M, scale=TRUE)
+biplot(x = pca, scale = 0, cex =0.6, col = c("black", "red"))
+```
+Por último, y puesto que es el objetivo principal de este análisis, se puede observar aquellas variables que contribuyen mayormente a los componentes. Los primeros resultados son aquellas relacionadas con el nivel de mercurio (X11, X7, X10, X9), la cual es la variable objetivo, por lo que no se toman en cuenta. Seguida de estas, se puede observar que aquellas variables que principalmente contribuyen de forma significativa son X3 (alcalinidad) y X4 (PH). En menor medida, X5 (calcio) y X6 (clorofila) también influyen de forma notable.
+
+```{r}
+library("factoextra")
+fviz_contrib(pca, choice="var", axes=1, top=10)
+```
+
+
+<!-- -------------------------------------------------- -->
+
+
+# Conclusión
+
+La utilización de herramientas estadisticas como las pruebas de normalidad y el análisis de componentes principales nos pueden ayudar a realizar mejores modelaciones por medio de la examinación de las diferentes variables.
+
+Tras el análisis realizado, se pudo identificar que las variables que mayormente contribuyen a la contaminación de mercurio en los lagos son:
+* X3: Alcalinidad
+* X4: PH
+* X5: Calcio
+* X6: clorofila
+
+Si seleccionamos estas variables, podríamos reducir la dimensionalidad del conjunto de datos y seguir obteniendo un buen análisis de los datos. 
+
+
+<!-- -------------------------------------------------- -->
+
+
+# Anexos
+
+**Repositorio de Github:** https://github.com/dscazares/Portafolio-TC3007C
